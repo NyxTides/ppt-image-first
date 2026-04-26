@@ -6,6 +6,8 @@ Conversation-first, image-first PPT workflow for building presentation plans, st
 
 `ppt-image-first` is designed for PPT / slides / decks that should not jump straight into rigid templates or direct slide assembly. It first clarifies the deck, builds a content basis, proposes visual directions with real previews, supports refinement, and only then moves into locked planning and downstream generation.
 
+> **Output note: this is an image-first workflow.** By default, the workflow uses **GPT Image 2** to generate full-slide page visuals, then places those page images into a PPTX container for delivery. It is not a fully editable PowerPoint generator that recreates every text box, shape, chart, and decoration as native PowerPoint objects. The result is closer to a high-fidelity visual deck: suitable for presenting, sharing, and image-level retouching, but slide text and design elements are usually not individually editable as native PPT elements.
+
 ## Quick examples
 
 ### 1. Workflow overview slide
@@ -98,6 +100,8 @@ That means:
 ### 2. Image-first
 
 The workflow assumes that visual direction should be tested with **actual generated preview images**, not just text descriptions, wireframes, or placeholder shells.
+
+Final generation follows the same logic: it prioritizes using **GPT Image 2** to render complete slide pages and then packages those rendered pages into PPTX. This preserves visual consistency and finish, but it does not promise that every element is a native editable PowerPoint object.
 
 ### 3. Content before styling when needed
 
