@@ -1054,14 +1054,38 @@
         .replaceAll("'", '&#39;');
     }
 
+    function getStageDisplaySize() {
+      const rect = stageFrame.getBoundingClientRect();
+      return {
+        width: rect.width || stageCanvas.clientWidth || 1600,
+        height: rect.height || stageCanvas.clientHeight || 900
+      };
+    }
+
+    function loadImageForExport(src) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        if (!src.startsWith('data:') && !src.startsWith('file:')) {
+          img.crossOrigin = 'anonymous';
+        }
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error('图片加载失败，无法生成标注预览图。'));
+        img.src = src;
+        if (img.complete && img.naturalWidth) {
+          resolve(img);
+        }
+      });
+    }
+
     async function buildAnnotatedPreview(slide, pageState) {
-      const img = new Image();
-      img.src = slide.image;
-      await img.decode();
+      const img = await loadImageForExport(slide.image);
       const canvas = document.createElement('canvas');
-      canvas.width = 1600;
-      canvas.height = 900;
+      canvas.width = img.naturalWidth || 1600;
+      canvas.height = img.naturalHeight || 900;
       const out = canvas.getContext('2d');
+      const stageSize = getStageDisplaySize();
+      const widthScale = canvas.width / stageSize.width;
+      const noteScale = Math.max(widthScale, 1);
       out.drawImage(img, 0, 0, canvas.width, canvas.height);
 
       pageState.penStrokes.forEach(stroke => {
@@ -1070,7 +1094,7 @@
         out.lineCap = 'round';
         out.lineJoin = 'round';
         out.strokeStyle = stroke.color;
-        out.lineWidth = stroke.width * (canvas.width / stageFrame.getBoundingClientRect().width);
+        out.lineWidth = stroke.width * widthScale;
         stroke.points.forEach((point, index) => {
           const x = point.x * canvas.width;
           const y = point.y * canvas.height;
@@ -1083,8 +1107,8 @@
       pageState.rects.forEach(item => {
         out.beginPath();
         out.strokeStyle = item.color;
-        out.lineWidth = item.width * (canvas.width / stageFrame.getBoundingClientRect().width);
-        out.setLineDash([20, 16]);
+        out.lineWidth = item.width * widthScale;
+        out.setLineDash([20 * widthScale, 16 * widthScale]);
         out.strokeRect(item.x * canvas.width, item.y * canvas.height, item.w * canvas.width, item.h * canvas.height);
         out.setLineDash([]);
       });
@@ -1094,16 +1118,20 @@
         const y = note.y * canvas.height;
         out.fillStyle = 'rgba(188, 91, 40, 0.96)';
         out.beginPath();
-        out.arc(x, y, 20, 0, Math.PI * 2);
+        out.arc(x, y, 20 * noteScale, 0, Math.PI * 2);
         out.fill();
         out.fillStyle = '#fff';
-        out.font = '700 22px "Segoe UI Symbol", "Segoe UI", Arial, sans-serif';
+        out.font = `700 ${22 * noteScale}px "Segoe UI Symbol", "Segoe UI", Arial, sans-serif`;
         out.textAlign = 'center';
         out.textBaseline = 'middle';
-        out.fillText(getNoteMarker(index), x, y + 1);
+        out.fillText(getNoteMarker(index), x, y + noteScale);
       });
 
-      return canvas.toDataURL('image/png');
+      try {
+        return canvas.toDataURL('image/png');
+      } catch (error) {
+        throw new Error(`标注预览图导出失败：${error.message || error}`);
+      }
     }
 
     async function buildPayload(mode) {
@@ -1153,14 +1181,13 @@
     }
 
     async function copyPayload(mode) {
-      const payload = await buildPayload(mode);
-      const json = JSON.stringify(payload, null, 2);
-
       try {
+        const payload = await buildPayload(mode);
+        const json = JSON.stringify(payload, null, 2);
         await navigator.clipboard.writeText(json);
         draftStatus.textContent = `${mode === 'current' ? '当前页' : '全部页面'}结果已复制到剪贴板。回到当前对话粘贴发送即可。`;
-      } catch {
-        draftStatus.textContent = '复制失败，请检查浏览器是否允许写入剪贴板。';
+      } catch (error) {
+        draftStatus.textContent = error?.message || '复制失败，请检查浏览器是否允许写入剪贴板。';
       }
     }
 
